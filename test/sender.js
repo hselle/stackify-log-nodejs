@@ -15,7 +15,8 @@ var sinon = require('sinon');
 var logs = [];
 
 describe('Sender', function() {
-  let stub;
+  let gotStub;
+  let originalGot;
   let body = {
     'message': 'test'
   };
@@ -30,7 +31,9 @@ describe('Sender', function() {
   };
 
   before(function(){
-    stub = sinon.stub(sender, 'request')
+    originalGot = sender.__get__('got');
+    gotStub = { post: sinon.stub() };
+    sender.__set__('got', gotStub);
     event.on(config.EVENT_ERROR, function () {
       logs.push(arguments)
     })
@@ -40,12 +43,13 @@ describe('Sender', function() {
   });
 
   after(function(){
+    sender.__set__('got', originalGot);
     sinon.restore();
   });
 
   it('Error should be logged', function(done) {
     let error = new Error('some error');
-    stub.callsArgWith(1, error, {}, {})
+    gotStub.post.returns(Promise.reject(error));
     sender.send({}, function (){}, function (){});
     setTimeout(function () {
       expect(logs.length).to.be.equal(1)
@@ -53,28 +57,25 @@ describe('Sender', function() {
       expect(logs[0][1]).to.be.equal('some error')
       expect(logs[0][2]).to.eql([{'error':error}])
       done();
-    }, 1);
+    }, 10);
   })
 
   it('Success response', function(done) {
-    let error = new Error('some error');
-    stub.callsArgWith(1, null, response, response.body)
+    gotStub.post.returns(Promise.resolve(response));
     sender.send({}, function callback(cbResponse) {
       expect(cbResponse.success).to.be.equal(true)
       expect(cbResponse.appData).to.be.eql(response.body)
-    }, function fail() {
-
-    });
-    done();
+      done();
+    }, function fail() {});
   })
 
   it('Error response', function(done) {
-    let error = new Error('some error');
-    stub.callsArgWith(1, null, errorResponse, errorResponse.body)
-    sender.send({}, function callback(cbResponse) {
-    }, function fail(code) {
+    let httpError = new Error('HTTP Error');
+    httpError.response = errorResponse;
+    gotStub.post.returns(Promise.reject(httpError));
+    sender.send({}, function callback() {}, function fail(code) {
       expect(code).to.be.equal(401)
+      done();
     });
-    done();
   })
 });
