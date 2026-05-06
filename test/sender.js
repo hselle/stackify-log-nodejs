@@ -16,7 +16,6 @@ var logs = [];
 
 describe('Sender', function() {
   let gotStub;
-  let originalGot;
   let body = {
     'message': 'test'
   };
@@ -31,7 +30,6 @@ describe('Sender', function() {
   };
 
   before(function(){
-    originalGot = sender.__get__('got');
     gotStub = { post: sinon.stub() };
     sender.__set__('got', gotStub);
     event.on(config.EVENT_ERROR, function () {
@@ -43,7 +41,6 @@ describe('Sender', function() {
   });
 
   after(function(){
-    sender.__set__('got', originalGot);
     sinon.restore();
   });
 
